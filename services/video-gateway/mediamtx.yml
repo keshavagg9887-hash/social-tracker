@@ -1,17 +1,52 @@
 # MediaMTX Configuration for Social Empowerment Platform [M1]
+# Production-ready configuration for WebRTC, RTSP, RTMP, and HLS streaming
+
 logLevel: info
 logDestinations: [stdout]
 
-# Global streaming ports
+# Global streaming server ports
+rtsp: yes
 rtspAddress: :8554
+protocols: [tcp, udp]
+
+rtmp: yes
 rtmpAddress: :1935
+
+hls: yes
 hlsAddress: :8888
+hlsAlwaysRemux: yes
+hlsVariant: fMP4
+hlsSegmentCount: 5
+hlsSegmentDuration: 2s
+hlsPartDuration: 500ms
+
+webrtc: yes
 webrtcAddress: :8889
+webrtcAllowCrossOrigin: yes
+webrtcLocalUDPAddress: :8889
+webrtcICEServers2:
+  - url: stun:stun.l.google.com:19302
+  - url: stun:stun1.l.google.com:19302
+webrtcHandshakeTimeout: 15s
+
+# Control and metrics API
+api: yes
 apiAddress: :9997
 
-# Path configurations for stream publishing & playback
+metrics: no
+
+# Stream Path configurations
 paths:
-  # Wildcard route for all incoming camera streams
+  # Dedicated path for live camera feeds (e.g. live/<camera_id>)
+  ~^live/(?P<name>.+)$:
+    source: publisher
+    runOnInitRestart: no
+    publishUser: ""
+    publishPass: ""
+    readUser: ""
+    readPass: ""
+
+  # Fallback wildcard route for all incoming streams
   all:
     source: publisher
     runOnInitRestart: no
