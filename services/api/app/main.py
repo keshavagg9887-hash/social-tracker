@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from .ai_detections import router as ai_detections_router
 
 app = FastAPI(
     title="Social Empowerment Platform API",
@@ -15,6 +16,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Register AI Detections router [M2]
+app.include_router(ai_detections_router, prefix="/api")
+
 @app.get("/health", tags=["Health"])
 async def health_check():
     return {"status": "ok", "service": "social-empowerment-api"}
+
