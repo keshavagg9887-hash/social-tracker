@@ -1,0 +1,121 @@
+version: '3.8'
+
+services:
+  # Database [M3]
+  postgres:
+    image: postgres:16-alpine
+    container_name: sep-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-social_empowerment_db}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - sep-network
+
+  # Redis Broker & Cache [M3]
+  redis:
+    image: redis:7-alpine
+    container_name: sep-redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - sep-network
+
+  # MediaMTX Video Gateway [M1]
+  video-gateway:
+    image: bluenviron/mediamtx:latest
+    container_name: sep-video-gateway
+    restart: unless-stopped
+    ports:
+      - "8554:8554"   # RTSP
+      - "1935:1935"   # RTMP
+      - "8888:8888"   # HLS
+      - "8889:8889"   # WebRTC
+      - "9997:9997"   # API
+    volumes:
+      - ./services/video-gateway/mediamtx.yml:/mediamtx.yml
+    networks:
+      - sep-network
+
+  # FastAPI Backend Service [M3]
+  api:
+    build:
+      context: ./services/api
+      dockerfile: Dockerfile
+    container_name: sep-api
+    restart: unless-stopped
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-social_empowerment_db}
+      - REDIS_URL=redis://redis:6379/0
+      - SECRET_KEY=${SECRET_KEY:-change-this-to-a-super-secret-key-in-production}
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - sep-network
+
+  # AI Detection Worker [M2]
+  ai-worker:
+    build:
+      context: ./services/ai-worker
+      dockerfile: Dockerfile
+    container_name: sep-ai-worker
+    restart: unless-stopped
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - MEDIAMTX_RTSP_URL=rtsp://video-gateway:8554
+      - API_URL=http://api:8000
+    depends_on:
+      - redis
+      - video-gateway
+      - api
+    networks:
+      - sep-network
+
+  # Notification Worker [M3]
+  notification-worker:
+    build:
+      context: ./services/notification-worker
+      dockerfile: Dockerfile
+    container_name: sep-notification-worker
+    restart: unless-stopped
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-social_empowerment_db}
+    depends_on:
+      - redis
+      - postgres
+    networks:
+      - sep-network
+
+  # React Web Application [M4]
+  web:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/Dockerfile.web
+    container_name: sep-web
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - api
+    networks:
+      - sep-network
+
+networks:
+  sep-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:

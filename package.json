@@ -1,0 +1,16 @@
+{
+  "name": "social-empowerment-platform",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:web": "npm --workspace=apps/web run dev",
+    "build:web": "npm --workspace=apps/web run build"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0"
+  }
+}

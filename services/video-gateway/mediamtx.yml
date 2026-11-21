@@ -1,0 +1,17 @@
+# MediaMTX Configuration for Social Empowerment Platform [M1]
+logLevel: info
+logDestinations: [stdout]
+
+# Global streaming ports
+rtspAddress: :8554
+rtmpAddress: :1935
+hlsAddress: :8888
+webrtcAddress: :8889
+apiAddress: :9997
+
+# Path configurations for stream publishing & playback
+paths:
+  # Wildcard route for all incoming camera streams
+  all:
+    source: publisher
+    runOnInitRestart: no
