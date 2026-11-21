@@ -1,9 +1,9 @@
 version: '3.8'
 
 services:
-  # Database [M3]
+  # Database [M3] - PostgreSQL + PostGIS geospatial extensions
   postgres:
-    image: postgres:16-alpine
+    image: postgis/postgis:16-3.4-alpine
     container_name: sep-postgres
     restart: unless-stopped
     environment:
@@ -14,18 +14,29 @@ services:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-social_empowerment_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
     networks:
       - sep-network
 
-  # Redis Broker & Cache [M3]
+  # Redis Broker & Message Stream Queue [M3]
   redis:
     image: redis:7-alpine
     container_name: sep-redis
     restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
     ports:
       - "${REDIS_PORT:-6379}:6379"
     volumes:
       - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
     networks:
       - sep-network
 
@@ -39,7 +50,7 @@ services:
       - "1935:1935"   # RTMP
       - "8888:8888"   # HLS
       - "8889:8889"   # WebRTC
-      - "9997:9997"   # API
+      - "9997:9997"   # MediaMTX REST API
     volumes:
       - ./services/video-gateway/mediamtx.yml:/mediamtx.yml
     networks:
@@ -55,12 +66,16 @@ services:
     environment:
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-social_empowerment_db}
       - REDIS_URL=redis://redis:6379/0
-      - SECRET_KEY=${SECRET_KEY:-change-this-to-a-super-secret-key-in-production}
+      - SECRET_KEY=${SECRET_KEY:-change-this-to-a-super-secret-key-in-production-sep-2026}
+      - REDIS_STREAM_AI_EVENTS=ai:events
+      - REDIS_STREAM_NOTIFICATIONS=sep:notifications
     ports:
-      - "8000:8000"
+      - "${API_PORT:-8000}:8000"
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     networks:
       - sep-network
 
@@ -76,13 +91,16 @@ services:
       - MEDIAMTX_RTSP_URL=rtsp://video-gateway:8554
       - API_URL=http://api:8000
     depends_on:
-      - redis
-      - video-gateway
-      - api
+      redis:
+        condition: service_healthy
+      video-gateway:
+        condition: service_started
+      api:
+        condition: service_started
     networks:
       - sep-network
 
-  # Notification Worker [M3]
+  # Notification Worker - Alert Dispatcher [M3]
   notification-worker:
     build:
       context: ./services/notification-worker
@@ -91,10 +109,18 @@ services:
     restart: unless-stopped
     environment:
       - REDIS_URL=redis://redis:6379/0
+      - REDIS_STREAM_NOTIFICATIONS=sep:notifications
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-social_empowerment_db}
+      - SMTP_SERVER=${SMTP_SERVER:-}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
+      - WEBHOOK_URL=${WEBHOOK_URL:-}
     depends_on:
-      - redis
-      - postgres
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
     networks:
       - sep-network
 
@@ -106,9 +132,21 @@ services:
     container_name: sep-web
     restart: unless-stopped
     ports:
-      - "3000:80"
+      - "${WEB_PORT:-3000}:80"
     depends_on:
       - api
+    networks:
+      - sep-network
+
+  # Prometheus Metrics Scraper [M3]
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: sep-prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./infrastructure/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
     networks:
       - sep-network
 

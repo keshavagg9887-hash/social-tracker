@@ -1,10 +1,15 @@
-# Node
+# ==============================================================================
+# GITIGNORE - SOCIAL EMPOWERMENT PLATFORM [M3]
+# ==============================================================================
+
+# Node / Frontend
 node_modules/
 dist/
 dist-ssr/
 *.local
+.npm/
 
-# Python
+# Python & Virtual Environments
 __pycache__/
 *.py[cod]
 *$py.class
@@ -28,13 +33,39 @@ wheels/
 .venv/
 venv/
 ENV/
+*.pytest_cache/
+.coverage
+htmlcov/
 
-# Environment Variables
+# Local Databases & Caches
+*.db
+*.sqlite
+*.sqlite3
+postgres_data/
+redis_data/
+
+# Model Weights & Large Binaries (Blueprint rule: do not commit weights)
+*.pt
+*.pth
+*.onnx
+*.engine
+*.bin
+models/weights/
+
+# Video Files & Snapshots (Blueprint rule: do not commit private video/evidence)
+evidence/
+snapshots/
+*.mp4
+*.mkv
+*.avi
+*.h264
+
+# Environment Variables & Secrets
 .env
 .env.*
 !.env.example
 
-# IDE & OS
+# IDE & Operating System
 .vscode/
 .idea/
 *.swp
@@ -47,8 +78,7 @@ logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
-yarn-error.log*
 pnpm-debug.log*
 
-# Docker
+# Docker Temporary Files
 *.tmp
